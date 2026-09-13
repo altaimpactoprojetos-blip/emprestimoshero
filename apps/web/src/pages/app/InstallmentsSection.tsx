@@ -145,8 +145,11 @@ export function LoanFinanceActions({ loan, onDone }: { loan: Loan; onDone: () =>
 
 export function InstallmentsSection({ loan, onDone }: { loan: Loan; onDone: () => void }) {
   const { can } = useAuth();
+  const toast = useToast();
   const [receiving, setReceiving] = useState<Installment | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const charge = useMutation({ mutationFn: (v: { installmentId: string; type: 'PIX' | 'BOLETO' }) => api<{ id: string; payload: Record<string, string> }>('payments/charges', { body: v }), onSuccess: (c) => { toast('Cobrança emitida', 'success'); onDone(); void c; }, onError: (e) => toast(errorMessage(e), 'error') });
+  const remind = useMutation({ mutationFn: (v: { installmentId: string; channel: string }) => api<{ outcome: string }>('collections/send', { body: v }), onSuccess: (r) => toast(r.outcome === 'sent' ? 'Lembrete enviado' : `Lembrete não enviado (${r.outcome})`, r.outcome === 'sent' ? 'success' : 'info'), onError: (e) => toast(errorMessage(e), 'error') });
   return (
     <>
       <DataTable rows={loan.installments} emptyTitle="Sem parcelas" cardTitle={(i) => `Parcela ${i.number} · ${dateBR(i.dueDate)}`} columns={[
@@ -168,6 +171,13 @@ export function InstallmentsSection({ loan, onDone }: { loan: Loan; onDone: () =
       ]} />
       {expanded && (() => { const i = loan.installments.find((x) => x.id === expanded)!; return (
         <div className="card compact mt"><h3>Parcela {i.number} — composição</h3>
+          {loan.status === 'ACTIVE' && ['PENDING', 'PARTIAL'].includes(i.status) && (
+            <div className="flex mb">
+              {can('payments.register') && <><button className="btn sm" onClick={() => charge.mutate({ installmentId: i.id, type: 'PIX' })}>Gerar Pix</button><button className="btn sm" onClick={() => charge.mutate({ installmentId: i.id, type: 'BOLETO' })}>Gerar boleto</button></>}
+              {can('collections.manage') && <><button className="btn sm" onClick={() => remind.mutate({ installmentId: i.id, channel: 'EMAIL' })}>Lembrete por e-mail</button><button className="btn sm" onClick={() => remind.mutate({ installmentId: i.id, channel: 'SMS' })}>Lembrete por SMS</button><button className="btn sm" onClick={() => remind.mutate({ installmentId: i.id, channel: 'PORTAL' })}>Aviso no portal</button></>}
+            </div>
+          )}
+          {i.charges?.filter((c) => c.status === 'PENDING').map((c) => <div key={c.id} className="alert info"><strong>{c.type} pendente</strong> — {brl(c.amount)}{c.payload && Object.entries(c.payload).filter(([k]) => k !== 'instrucoes').map(([k, v]) => <div key={k} className="small"><strong>{k}:</strong> <span className="mono" style={{ wordBreak: 'break-all' }}>{v}</span></div>)}</div>)}
           <KV items={[['Principal / juros originais', `${brl(i.principalAmount)} / ${brl(i.interestAmount)}`], ['Principal em aberto', brl(i.balance.principalOpen)], ['Juros em aberto', brl(i.balance.interestOpen)], ['Multa', `${brl(i.balance.fine)}${i.fineApplied ? ' (já aplicada em pagamento anterior)' : ''}`], ['Mora acumulada', brl(i.balance.lateInterest)], ['Encargos carregados de pagamento parcial', brl(i.balance.chargesCarried)], ['Pago (principal / juros / encargos)', `${brl(i.paidPrincipal)} / ${brl(i.paidInterest)} / ${brl(i.paidCharges)}`], ['Último pagamento', dateBR(i.lastPaymentAt)], ['Cobranças Pix/boleto', i.charges?.length ? i.charges.map((c) => `${c.type} ${c.status} ${brl(c.amount)}`).join('; ') : 'nenhuma']]} />
         </div>
       ); })()}

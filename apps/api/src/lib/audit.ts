@@ -15,7 +15,7 @@ export async function audit(ctx: Partial<AuthContext> | null, input: AuditInput,
   await tx.auditLog.create({
     data: {
       companyId: ctx?.companyId ?? null,
-      userId: ctx?.userId ?? null,
+      userId: ctx?.userId && ctx.userId !== 'system' ? ctx.userId : null,
       userName: ctx?.userName ?? null,
       action: input.action,
       entity: input.entity,

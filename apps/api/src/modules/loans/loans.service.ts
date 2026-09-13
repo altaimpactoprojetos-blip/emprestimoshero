@@ -106,7 +106,7 @@ function loanDataFromInput(input: LoanInput, sim: ReturnType<typeof simulate>): 
 }
 
 export async function addEvent(tx: Tx | typeof prisma, loanId: string, type: string, ctx: Partial<AuthContext> | null, data?: unknown) {
-  await tx.loanEvent.create({ data: { loanId, type, userId: ctx?.userId ?? null, userName: ctx?.userName ?? null, data: data === undefined ? undefined : (JSON.parse(JSON.stringify(data)) as never) } });
+  await tx.loanEvent.create({ data: { loanId, type, userId: ctx?.userId && ctx.userId !== 'system' ? ctx.userId : null, userName: ctx?.userName ?? null, data: data === undefined ? undefined : (JSON.parse(JSON.stringify(data)) as never) } });
 }
 
 export async function createLoan(ctx: AuthContext, input: LoanInput, opts: { parentLoanId?: string; source?: 'RENEGOTIATION'; tx?: Tx } = {}) {

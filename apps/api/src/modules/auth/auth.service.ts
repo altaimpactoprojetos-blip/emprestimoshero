@@ -6,7 +6,7 @@ import { addDays, addMinutes } from 'date-fns';
 import { Role } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { config } from '../../config.js';
-import { badRequest, unauthorized, forbidden, notFound } from '../../lib/errors.js';
+import { badRequest, unauthorized, forbidden, notFound, AppError } from '../../lib/errors.js';
 import { decrypt, encrypt, randomToken, sha256 } from '../../lib/crypto.js';
 import { signAccessToken } from '../../middleware/auth.js';
 import jwt from 'jsonwebtoken';
@@ -197,4 +197,16 @@ export async function getUserOrThrow(id: string) {
   const u = await prisma.user.findUnique({ where: { id } });
   if (!u) throw notFound('Usuário não encontrado');
   return u;
+}
+
+/** Troca um token de link seguro (enviado por e-mail/SMS) por uma sessão do portal do cliente. */
+export async function loginClientByToken(rawToken: string, meta: { ip?: string | null; userAgent?: string | null }) {
+  const t = await prisma.clientAccessToken.findUnique({ where: { tokenHash: sha256(rawToken) }, include: { client: { include: { user: true, company: { select: { slug: true, status: true } } } } } });
+  if (!t || t.expiresAt < new Date()) throw unauthorized('Link inválido ou expirado');
+  if (t.client.company.status === 'SUSPENDED' || t.client.company.status === 'CANCELLED') throw unauthorized('Acesso indisponível');
+  if (!t.client.user || !t.client.user.active) throw new AppError(403, 'Este cliente ainda não possui acesso ao portal. Solicite a criação do acesso à empresa.', 'NO_PORTAL_ACCESS');
+  await prisma.clientAccessToken.update({ where: { id: t.id }, data: { usedAt: new Date() } });
+  const session = await issueSession(t.client.user.id, meta);
+  await audit({ userId: t.client.user.id, userName: t.client.user.name, companyId: t.companyId, ip: meta.ip ?? null }, { action: 'LOGIN_PORTAL_LINK', entity: 'User', entityId: t.client.user.id });
+  return { ...session, target: t.target, companySlug: t.client.company.slug };
 }

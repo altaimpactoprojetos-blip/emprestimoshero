@@ -44,6 +44,15 @@ authRouter.post('/portal/login', loginLimiter, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+authRouter.post('/portal/token', loginLimiter, async (req, res, next) => {
+  try {
+    const body = parse(z.object({ token: z.string().min(10) }), req.body);
+    const r = await svc.loginClientByToken(body.token, meta(req));
+    res.cookie(REFRESH_COOKIE, r.refreshToken, cookieOpts);
+    res.json({ accessToken: r.accessToken, user: r.user, target: r.target, companySlug: r.companySlug });
+  } catch (e) { next(e); }
+});
+
 authRouter.post('/refresh', async (req, res, next) => {
   try {
     respondSession(res, await svc.refreshSession(req.cookies?.[REFRESH_COOKIE], meta(req)));
