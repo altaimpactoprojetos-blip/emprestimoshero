@@ -46,12 +46,17 @@ export function renderPdf(blocks: Block[], opts: PdfOptions = {}): Promise<Buffe
         case 'spacer': doc.moveDown(b.size ?? 1); break;
         case 'kv': {
           for (const [k, v] of b.rows) {
-            ensure(16);
+            doc.fontSize(9.5);
+            const hk = doc.font('Helvetica-Bold').heightOfString(k, { width: 205 });
+            const hv = doc.font('Helvetica').heightOfString(v, { width: width - 215 });
+            const h = Math.max(hk, hv, 12);
+            ensure(h + 4);
             const y = doc.y;
-            doc.font('Helvetica-Bold').fontSize(9.5).text(k, 50, y, { width: 180 });
-            doc.font('Helvetica').fontSize(9.5).text(v, 235, y, { width: width - 185 });
-            doc.y = Math.max(doc.y, y + 14);
+            doc.font('Helvetica-Bold').text(k, 50, y, { width: 205 });
+            doc.font('Helvetica').text(v, 265, y, { width: width - 215 });
+            doc.y = y + h + 3;
           }
+          doc.x = 50;
           doc.moveDown(0.5);
           break;
         }
@@ -72,6 +77,7 @@ export function renderPdf(blocks: Block[], opts: PdfOptions = {}): Promise<Buffe
           };
           row(b.columns.map((c) => c.label), true, '#e3ebf4');
           for (const r of b.rows) row(r, false);
+          doc.x = 50;
           doc.moveDown(0.8);
           break;
         }
@@ -90,7 +96,7 @@ export function renderPdf(blocks: Block[], opts: PdfOptions = {}): Promise<Buffe
       }
     }
     if (opts.footer) {
-      doc.fontSize(8).fillColor('#5b6776').text(opts.footer, 50, doc.page.height - 45, { width, align: 'center' });
+      doc.fontSize(8).fillColor('#5b6776').text(opts.footer, 50, doc.page.height - 64, { width, align: 'center', lineBreak: false });
     }
     doc.end();
   });

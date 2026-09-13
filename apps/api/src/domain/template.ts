@@ -66,7 +66,7 @@ O(A) DEVEDOR(A) pagará o empréstimo em {{parcelas.quantidade}} parcela(s) com 
 
 {{cronograma}}
 
-Formas de pagamento: {{pagamento.formas}}.
+Formas de pagamento: {{pagamento.formas}}
 
 ## 5. Atraso
 Em caso de atraso, incidirão sobre a parcela em aberto multa de {{atraso.multa}} e juros de mora de {{atraso.mora}} ao mês, calculados por dia de atraso, sem prejuízo das medidas de cobrança cabíveis. Os pagamentos recebidos serão imputados na seguinte ordem: encargos de atraso, juros e principal.

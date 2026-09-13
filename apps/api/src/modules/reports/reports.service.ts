@@ -176,14 +176,14 @@ export async function monthlyPdf(companyId: string, data: MonthlyData & { previo
       ['Estornos', `${t.reversalsCount} · ${cmp(t.reversals, p?.reversals)}`],
       ['Saldos transferidos por renegociação', formatBRL(t.renegotiatedBalance)],
       ['Despesas', cmp(t.expenses, p?.expenses)],
-      ['Resultado (juros + encargos − despesas)', cmp(t.result, p?.result)],
+      ['Resultado (juros + encargos - despesas)', cmp(t.result, p?.result)],
       ['Parcelas em atraso na referência', `${t.overdueCount} parcela(s) de ${t.overdueClients} cliente(s) · ${formatBRL(t.overdueAmount)}`],
       [`Projeção de vencimentos (${MONTH_LABEL(t.projectionMonth)})`, `${t.projectionCount} parcela(s) · ${formatBRL(t.projectionAmount)}`],
     ] },
     { type: 'heading', text: 'Empréstimos liberados' },
     { type: 'table', columns: [{ label: 'Nº', width: 0.5 }, { label: 'Cliente', width: 2 }, { label: 'Liberação', width: 1 }, { label: 'Liberado', width: 1, align: 'right' }, { label: 'Principal', width: 1, align: 'right' }, { label: 'Parc.', width: 0.5, align: 'right' }], rows: data.details.loans.map((l) => [String(l.number), l.client, formatBRDate(l.disbursedAt), formatBRL(l.disbursed), formatBRL(l.principal), String(l.installments)]) },
     { type: 'heading', text: 'Recebimentos' },
-    { type: 'table', columns: [{ label: 'Data', width: 0.9 }, { label: 'Cliente', width: 2 }, { label: 'Contr./Parc.', width: 0.8 }, { label: 'Valor', width: 0.9, align: 'right' }, { label: 'Principal', width: 0.9, align: 'right' }, { label: 'Juros', width: 0.9, align: 'right' }, { label: 'Encargos', width: 0.9, align: 'right' }, { label: 'Desc.', width: 0.8, align: 'right' }], rows: data.details.payments.map((r) => [formatBRDate(r.paidAt), r.client, `${r.loan}/${r.installment}`, formatBRL(r.amount), formatBRL(r.principal), formatBRL(r.interest), formatBRL(r.charges), formatBRL(r.discount)]) },
+    { type: 'table', columns: [{ label: 'Data', width: 0.9 }, { label: 'Cliente', width: 2 }, { label: 'Contr./Parc.', width: 1.1 }, { label: 'Valor', width: 0.9, align: 'right' }, { label: 'Principal', width: 0.9, align: 'right' }, { label: 'Juros', width: 0.9, align: 'right' }, { label: 'Encargos', width: 0.9, align: 'right' }, { label: 'Desc.', width: 0.8, align: 'right' }], rows: data.details.payments.map((r) => [formatBRDate(r.paidAt), r.client, `${r.loan}/${r.installment}`, formatBRL(r.amount), formatBRL(r.principal), formatBRL(r.interest), formatBRL(r.charges), formatBRL(r.discount)]) },
     { type: 'heading', text: 'Estornos' },
     { type: 'table', columns: [{ label: 'Data', width: 1 }, { label: 'Cliente', width: 2 }, { label: 'Valor', width: 1, align: 'right' }, { label: 'Justificativa', width: 3 }], rows: data.details.reversals.map((r) => [formatBRDate(r.paidAt), r.client, formatBRL(r.amount), r.reason ?? '']) },
     { type: 'heading', text: 'Despesas' },
@@ -193,7 +193,7 @@ export async function monthlyPdf(companyId: string, data: MonthlyData & { previo
     { type: 'heading', text: `Projeção de vencimentos — ${MONTH_LABEL(t.projectionMonth)}` },
     { type: 'table', columns: [{ label: 'Cliente', width: 2 }, { label: 'Contr./Parc.', width: 1 }, { label: 'Vencimento', width: 1 }, { label: 'Valor', width: 1, align: 'right' }], rows: data.details.projection.map((o) => [o.client, `${o.loan}/${o.installment}`, formatBRDate(o.dueDate), formatBRL(o.amount)]) },
     { type: 'heading', text: 'Fórmulas dos indicadores' },
-    ...Object.values(INDICATOR_FORMULAS).map((f): Block => ({ type: 'small', text: f })),
+    ...Object.values(INDICATOR_FORMULAS).map((f): Block => ({ type: 'small', text: f.replace(/÷/g, '/').replace(/×/g, 'x') })),
   ];
   return renderPdf(blocks, { title: `Relatório ${data.month}`, header: `${company.name} · Relatório mensal ${data.month} · v${meta.version}`, footer: 'Valores em reais. Principal recuperado é devolução de capital e não compõe o resultado.' });
 }
