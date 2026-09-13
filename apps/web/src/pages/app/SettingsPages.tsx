@@ -5,12 +5,14 @@ import { useAuth } from '../../auth/AuthContext';
 import { ROLE } from '../../lib/labels';
 import { dateTimeBR } from '../../lib/format';
 import { PageHeader, Loading, ErrorState, Field, useForm, useToast, errorMessage, Tabs, DataTable, Modal, Alert, Badge } from '../../components/ui';
+import { ProductsSettings } from './LoansPages';
 
 export function SettingsPage() {
   const [tab, setTab] = useState('empresa');
   const { can, user } = useAuth();
   const tabs = [
     { key: 'empresa', label: 'Empresa e marca' },
+    ...(can('settings.manage') ? [{ key: 'produtos', label: 'Produtos de crédito' }] : []),
     ...(can('users.manage') ? [{ key: 'usuarios', label: 'Usuários' }, { key: 'permissoes', label: 'Permissões' }] : []),
     { key: 'seguranca', label: 'Minha conta e 2FA' },
     { key: 'integracoes', label: 'Integrações' },
@@ -20,6 +22,7 @@ export function SettingsPage() {
       <PageHeader title="Configurações" subtitle={user?.company?.name} />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       {tab === 'empresa' && <CompanySettings />}
+      {tab === 'produtos' && <ProductsSettings />}
       {tab === 'usuarios' && <UsersSettings />}
       {tab === 'permissoes' && <PermissionsSettings />}
       {tab === 'seguranca' && <SecuritySettings />}
