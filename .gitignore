@@ -9,3 +9,4 @@ backups/
 apps/web/dist/
 .DS_Store
 coverage/
+storage-test/

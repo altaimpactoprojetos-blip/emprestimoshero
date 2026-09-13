@@ -8,7 +8,7 @@ import { PlatformOverview, PlatformCompanies, PlatformCompanyDetail, PlatformPla
 import { SettingsPage } from './pages/app/SettingsPages';
 import { AuditPage } from './pages/app/AuditPage';
 import { appRoutes, appNav } from './pages/app/index';
-import { portalRoutes, PortalShell, PortalLoginPage } from './pages/portal/index';
+import { portalRoutes, PortalShell, PortalLoginPage, PortalAccessPage } from './pages/portal/index';
 
 function Home() {
   const { user } = useAuth();
@@ -54,6 +54,7 @@ export function AppRoutes() {
       </Route>
 
       <Route path="/portal/:slug/login" element={<PortalLoginPage />} />
+      <Route path="/portal/:slug/acesso" element={<PortalAccessPage />} />
       <Route path="/portal/:slug/recuperar-senha" element={<PortalForgot />} />
       <Route path="/portal/:slug/redefinir-senha" element={<PortalReset />} />
       <Route path="/portal/:slug" element={<PortalShell />}>{portalRoutes}</Route>
