@@ -54,3 +54,23 @@ Implementadas em `apps/api/src/domain/finance.ts` e `apps/api/src/domain/install
 - Inadimplência (clientes) = clientes com parcela em atraso ÷ clientes com contrato ativo × 100.
 - Inadimplência 30+ = saldo com mais de 30 dias de atraso ÷ saldo total a receber × 100.
 - Principal recuperado é devolução de capital e não é contabilizado como lucro; o resultado do mês = juros + encargos − despesas.
+
+## Empréstimos sobre saldo devedor (engine `BALANCE`)
+
+Implementação: `apps/api/src/domain/balance.ts` (testes em `apps/api/tests/balance.test.ts`).
+
+- **Taxa por período**: a taxa informada vale exatamente para o período escolhido (diário, semanal, quinzenal ou mensal), sem conversão.
+- **Juros sobre o saldo atual**: no início de cada período, juros = principal em aberto × taxa (arredondado em centavos). Os juros valem pelo período inteiro, mesmo que o pagamento ocorra antes do vencimento.
+- **Ordem de abatimento**: encargos de atraso → juros pendentes (mais antigos primeiro) → principal.
+- **Juros não pagos**: ficam pendentes. No início do período seguinte, conforme a configuração, ficam **separados** (não geram juros) ou são **somados ao principal**.
+- **Pagamento no dia do vencimento** conta no período que vence. Pagamentos com data futura ou acima do saldo são recusados.
+- **Tipos de cobrança**:
+  - *Só juros*: os juros vencem ao fim de cada período; o principal vence na data final.
+  - *Parcelas fixas*: parcela = juros do período + amortização Price sobre o saldo e os períodos restantes. Pagamento extra reduz as próximas parcelas e mantém o prazo.
+  - *Pagamento único*: principal e juros acumulados vencem na data final.
+- **Prazo**: número de períodos entre a data do empréstimo e o vencimento, arredondado para cima. Depois do vencimento final, os juros continuam correndo a cada período enquanto houver saldo.
+- **Atraso**: o empréstimo fica *atrasado* no dia seguinte ao vencimento não pago. Multa (%) única sobre cada valor que vence sem pagamento. Mora (% ao mês ÷ 30 × dias) sobre o valor vencido. Os encargos são somados ao saldo.
+- **Recálculo completo**: editar ou excluir um pagamento, ou alterar as condições, reprocessa o empréstimo desde o início e regrava a destinação (juros/principal/encargos) e o saldo após cada pagamento.
+- **Total a receber**: saldo de hoje + juros futuros previstos até o vencimento, supondo pagamentos em dia.
+
+Exemplo validado em teste: R$ 1.000 a 10% ao mês. Juros do mês: R$ 100. O cliente paga R$ 400: R$ 100 quitam os juros e R$ 300 abatem o principal. Novo saldo: R$ 700. Juros do mês seguinte: R$ 70.

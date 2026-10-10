@@ -3,19 +3,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, openFile } from '../../lib/api';
 import { brl, dateBR, dateTimeBR, maskDocument, maskPhone } from '../../lib/format';
-import { INSTALLMENT_STATUS, LOAN_STATUS, PAYMENT_METHOD, PAYMENT_STATUS, REMINDER_STATUS, CHANNEL } from '../../lib/labels';
+import { BILLING_TYPE, INSTALLMENT_STATUS, LOAN_STATUS, PAYMENT_METHOD, PAYMENT_STATUS, REMINDER_STATUS, CHANNEL } from '../../lib/labels';
 import type { Client, Loan, Payment } from '../../lib/types';
 import { useAuth } from '../../auth/AuthContext';
-import { PageHeader, Loading, ErrorState, DataTable, Modal, Field, StatusBadge, useForm, useToast, errorMessage, KV, Badge, Tabs, Stat, EmptyState, Alert } from '../../components/ui';
+import { PageHeader, Loading, ErrorState, DataTable, Modal, Field, StatusBadge, useForm, useToast, errorMessage, KV, Badge, Tabs, Stat, EmptyState, Alert, Confirm } from '../../components/ui';
+import { StatusPill } from '../../components/lending';
+import { openWhatsApp } from '../../lib/share';
 
-const emptyClient = { personType: 'PF', name: '', document: '', email: '', phone: '', birthDate: '', addressZip: '', addressStreet: '', addressNumber: '', addressComplement: '', addressDistrict: '', addressCity: '', addressState: '', notes: '', status: 'ACTIVE', prefEmail: true, prefSms: true, prefPortal: true };
+const emptyClient = { personType: 'PF', name: '', document: '', email: '', phone: '', birthDate: '', rg: '', nationality: 'brasileiro(a)', maritalStatus: '', profession: '', addressZip: '', addressStreet: '', addressNumber: '', addressComplement: '', addressDistrict: '', addressCity: '', addressState: '', notes: '', status: 'ACTIVE', prefEmail: true, prefSms: true, prefPortal: true };
 
 export function ClientForm({ initial, onClose, onSaved }: { initial?: Client | null; onClose: () => void; onSaved: (c: Client) => void }) {
   const toast = useToast();
   const f = useForm(emptyClient);
   const [dup, setDup] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {
-    if (initial) f.setValues({ personType: initial.personType, name: initial.name, document: maskDocument(initial.document), email: initial.email ?? '', phone: maskPhone(initial.phone), birthDate: initial.birthDate?.slice(0, 10) ?? '', addressZip: initial.addressZip ?? '', addressStreet: initial.addressStreet ?? '', addressNumber: initial.addressNumber ?? '', addressComplement: initial.addressComplement ?? '', addressDistrict: initial.addressDistrict ?? '', addressCity: initial.addressCity ?? '', addressState: initial.addressState ?? '', notes: initial.notes ?? '', status: initial.status, prefEmail: initial.contactPreferences?.email !== false, prefSms: initial.contactPreferences?.sms !== false, prefPortal: initial.contactPreferences?.portal !== false });
+    if (initial) f.setValues({ personType: initial.personType, name: initial.name, document: maskDocument(initial.document), email: initial.email ?? '', phone: maskPhone(initial.phone), birthDate: initial.birthDate?.slice(0, 10) ?? '', rg: initial.rg ?? '', nationality: initial.nationality ?? '', maritalStatus: initial.maritalStatus ?? '', profession: initial.profession ?? '', addressZip: initial.addressZip ?? '', addressStreet: initial.addressStreet ?? '', addressNumber: initial.addressNumber ?? '', addressComplement: initial.addressComplement ?? '', addressDistrict: initial.addressDistrict ?? '', addressCity: initial.addressCity ?? '', addressState: initial.addressState ?? '', notes: initial.notes ?? '', status: initial.status, prefEmail: initial.contactPreferences?.email !== false, prefSms: initial.contactPreferences?.sms !== false, prefPortal: initial.contactPreferences?.portal !== false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial]);
   const checkDup = async () => {
@@ -27,7 +29,7 @@ export function ClientForm({ initial, onClose, onSaved }: { initial?: Client | n
   const save = useMutation({
     mutationFn: () => {
       const v = f.values;
-      const body = { personType: v.personType, name: v.name, document: v.document, email: v.email || null, phone: v.phone || null, birthDate: v.birthDate || null, addressZip: v.addressZip || null, addressStreet: v.addressStreet || null, addressNumber: v.addressNumber || null, addressComplement: v.addressComplement || null, addressDistrict: v.addressDistrict || null, addressCity: v.addressCity || null, addressState: v.addressState || null, notes: v.notes || null, status: v.status, contactPreferences: { email: v.prefEmail, sms: v.prefSms, portal: v.prefPortal } };
+      const body = { personType: v.personType, name: v.name, document: v.document, email: v.email || null, phone: v.phone || null, birthDate: v.birthDate || null, rg: v.rg || null, nationality: v.nationality || null, maritalStatus: v.maritalStatus || null, profession: v.profession || null, addressZip: v.addressZip || null, addressStreet: v.addressStreet || null, addressNumber: v.addressNumber || null, addressComplement: v.addressComplement || null, addressDistrict: v.addressDistrict || null, addressCity: v.addressCity || null, addressState: v.addressState || null, notes: v.notes || null, status: v.status, contactPreferences: { email: v.prefEmail, sms: v.prefSms, portal: v.prefPortal } };
       return initial ? api<Client>(`clients/${initial.id}`, { method: 'PUT', body }) : api<Client>('clients', { body });
     },
     onSuccess: (c) => { toast('Cliente salvo', 'success'); onSaved(c); },
@@ -43,10 +45,18 @@ export function ClientForm({ initial, onClose, onSaved }: { initial?: Client | n
       </div>
       <Field label={f.values.personType === 'PJ' ? 'Razão social' : 'Nome completo'}><input {...f.bind('name')} /></Field>
       <div className="form-row cols-3">
-        <Field label="E-mail"><input type="email" {...f.bind('email')} /></Field>
-        <Field label="Telefone celular"><input {...f.bind('phone')} placeholder="(11) 99999-9999" /></Field>
+        <Field label="Telefone celular (WhatsApp)"><input type="tel" {...f.bind('phone')} placeholder="(11) 99999-9999" /></Field>
+        <Field label="E-mail (opcional)"><input type="email" {...f.bind('email')} /></Field>
         <Field label={f.values.personType === 'PJ' ? 'Data de fundação' : 'Data de nascimento'}><input type="date" {...f.bind('birthDate')} /></Field>
       </div>
+      {f.values.personType === 'PF' && (
+        <div className="form-row cols-4">
+          <Field label="RG"><input {...f.bind('rg')} /></Field>
+          <Field label="Nacionalidade"><input {...f.bind('nationality')} /></Field>
+          <Field label="Estado civil"><select {...f.bind('maritalStatus')}><option value="">Selecione...</option>{['solteiro(a)', 'casado(a)', 'divorciado(a)', 'viúvo(a)', 'união estável'].map((o) => <option key={o} value={o}>{o}</option>)}</select></Field>
+          <Field label="Profissão"><input {...f.bind('profession')} /></Field>
+        </div>
+      )}
       <h3>Endereço</h3>
       <div className="form-row cols-4">
         <Field label="CEP"><input {...f.bind('addressZip')} /></Field>
@@ -58,12 +68,12 @@ export function ClientForm({ initial, onClose, onSaved }: { initial?: Client | n
         <Field label="UF"><input maxLength={2} {...f.bind('addressState')} /></Field>
       </div>
       <Field label="Observações"><textarea {...f.bind('notes')} /></Field>
-      <h3>Preferências de contato</h3>
-      <div className="flex">
+      <details><summary className="small" style={{ cursor: 'pointer', color: 'var(--brand-secondary)' }}>Preferências de contato automático</summary>
+      <div className="flex mt">
         <label className="check"><input type="checkbox" {...f.bindCheck('prefEmail')} /> E-mail</label>
         <label className="check"><input type="checkbox" {...f.bindCheck('prefSms')} /> SMS</label>
         <label className="check"><input type="checkbox" {...f.bindCheck('prefPortal')} /> Avisos no portal</label>
-      </div>
+      </div></details>
       <div className="form-actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={save.isPending || !!dup} onClick={() => save.mutate()}>{save.isPending ? 'Salvando...' : 'Salvar'}</button></div>
     </Modal>
   );
@@ -74,26 +84,43 @@ export function ClientsPage() {
   const qc = useQueryClient();
   const { can } = useAuth();
   const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const q = useQuery({ queryKey: ['clients', status], queryFn: () => api<Client[]>(`clients?status=${status}`) });
+  const n = search.trim().toLowerCase();
+  const digits = search.replace(/\D/g, '');
+  const rows = (q.data ?? []).filter((c) => !n || c.name.toLowerCase().includes(n) || (digits.length >= 3 && (c.document.includes(digits) || (c.phone ?? '').includes(digits))));
   return (
     <>
-      <PageHeader title="Clientes" subtitle="Cadastro, histórico financeiro e documentos." actions={can('clients.manage') && <button className="btn primary" onClick={() => setOpen(true)}>Cadastrar cliente</button>} />
-      <div className="card">
-        {q.isLoading ? <Loading /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : (
-          <DataTable rows={q.data!} searchKeys={(c) => `${c.name} ${c.document} ${c.email ?? ''} ${c.phone ?? ''}`} onRowClick={(c) => nav(`/app/clientes/${c.id}`)} cardTitle={(c) => c.name}
-            emptyTitle="Nenhum cliente cadastrado" emptyText="Cadastre o primeiro cliente para iniciar as operações."
-            filters={<select className="input" value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Todas as situações</option><option value="ACTIVE">Ativos</option><option value="BLOCKED">Bloqueados</option><option value="INACTIVE">Inativos</option></select>}
-            columns={[
-              { key: 'name', label: 'Nome', sortValue: (c) => c.name, render: (c) => <><strong>{c.name}</strong><div className="small muted">{maskDocument(c.document)}</div></> },
-              { key: 'contact', label: 'Contato', render: (c) => <>{c.email}<div className="small muted">{maskPhone(c.phone)}</div></> },
-              { key: 'loans', label: 'Empréstimos', num: true, render: (c) => c.summary?.loans ?? 0, sortValue: (c) => c.summary?.loans ?? 0 },
-              { key: 'open', label: 'Saldo devedor', num: true, render: (c) => brl(c.summary?.openBalance), sortValue: (c) => Number(c.summary?.openBalance ?? 0) },
-              { key: 'overdue', label: 'Em atraso', num: true, render: (c) => Number(c.summary?.overdueBalance) > 0 ? <span style={{ color: 'var(--danger)' }}>{brl(c.summary?.overdueBalance)} ({c.summary?.maxDaysLate} d)</span> : '—', sortValue: (c) => Number(c.summary?.overdueBalance ?? 0) },
-              { key: 'status', label: 'Situação', render: (c) => <Badge tone={c.status === 'ACTIVE' ? 'success' : c.status === 'BLOCKED' ? 'danger' : 'neutral'}>{{ ACTIVE: 'Ativo', BLOCKED: 'Bloqueado', INACTIVE: 'Inativo' }[c.status]}</Badge> },
-            ]} />
-        )}
+      <div className="section-title" style={{ marginTop: 0 }}>
+        <h1>Clientes</h1>
+        {can('clients.manage') && <button className="btn primary" onClick={() => setOpen(true)}>+ Novo</button>}
       </div>
+      <div className="search-bar"><input placeholder="Buscar pelo nome do cliente" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Buscar pelo nome do cliente" /></div>
+      <div className="chips">
+        {[['', 'Todos'], ['ACTIVE', 'Ativos'], ['BLOCKED', 'Bloqueados'], ['INACTIVE', 'Inativos']].map(([k, l]) => <button key={k} className={`chip ${status === k ? 'active' : ''}`} onClick={() => setStatus(k)}>{l}</button>)}
+      </div>
+      {q.isLoading ? <Loading /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : rows.length === 0 ? (
+        <div className="card"><EmptyState title={search ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'} text={search ? 'Tente outro nome.' : 'Toque em “+ Novo” para cadastrar o primeiro cliente.'} /></div>
+      ) : (
+        <div className="list">
+          {rows.map((c) => {
+            const overdue = Number(c.summary?.overdueBalance) > 0;
+            return (
+              <div key={c.id} className="list-item link" onClick={() => nav(`/app/clientes/${c.id}`)}>
+                <div className="main-col">
+                  <div className="title">{c.name} {c.status !== 'ACTIVE' && <Badge tone={c.status === 'BLOCKED' ? 'danger' : 'neutral'}>{c.status === 'BLOCKED' ? 'Bloqueado' : 'Inativo'}</Badge>}</div>
+                  <div className="meta">{maskPhone(c.phone) || maskDocument(c.document)} · {c.summary?.loans ?? 0} empréstimo(s)</div>
+                </div>
+                <div className="right">
+                  <div className="amt">{brl(c.summary?.openBalance)}</div>
+                  {overdue ? <span className="st-pill st-OVERDUE">Atrasado {c.summary?.maxDaysLate} d</span> : Number(c.summary?.openBalance) > 0 ? <span className="st-pill st-ON_TIME">Em dia</span> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {open && <ClientForm onClose={() => setOpen(false)} onSaved={(c) => { setOpen(false); qc.invalidateQueries({ queryKey: ['clients'] }); nav(`/app/clientes/${c.id}`); }} />}
     </>
   );
@@ -127,7 +154,9 @@ export function ClientDetailPage() {
   const [portalOpen, setPortalOpen] = useState(false);
   const [portalPw, setPortalPw] = useState('');
   const [reply, setReply] = useState<{ id: string; status: string; response: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const refresh = () => qc.invalidateQueries({ queryKey: ['client', id] });
+  const remove = useMutation({ mutationFn: () => api(`clients/${id}`, { method: 'DELETE' }), onSuccess: () => { toast('Cliente excluído', 'success'); qc.invalidateQueries({ queryKey: ['clients'] }); nav('/app/clientes', { replace: true }); }, onError: (e) => { setDeleting(false); toast(errorMessage(e), 'error'); } });
   const upload = async (file: File) => {
     const fd = new FormData(); fd.append('file', file); fd.append('type', docType);
     try { await api(`clients/${id}/documents`, { formData: fd }); toast('Documento anexado', 'success'); refresh(); } catch (e) { toast(errorMessage(e), 'error'); }
@@ -142,8 +171,10 @@ export function ClientDetailPage() {
     <>
       <PageHeader title={c.name} subtitle={`${c.personType === 'PJ' ? 'CNPJ' : 'CPF'} ${maskDocument(c.document)} · Cliente desde ${dateBR(c.createdAt)}`}
         actions={<>
-          {can('loans.create') && c.status === 'ACTIVE' && <button className="btn primary" onClick={() => nav(`/app/emprestimos/novo?clientId=${c.id}`)}>Simular empréstimo</button>}
+          {can('loans.create') && c.status === 'ACTIVE' && <button className="btn primary" onClick={() => nav(`/app/emprestimos/novo?clientId=${c.id}`)}>Novo empréstimo</button>}
           {can('clients.manage') && <button className="btn" onClick={() => setEditing(true)}>Editar cadastro</button>}
+          {c.phone && <button className="btn success" onClick={() => openWhatsApp(`Olá, ${c.name.split(' ')[0]}!`, c.phone)}>WhatsApp</button>}
+          {can('clients.manage') && <button className="btn" style={{ color: 'var(--danger)' }} onClick={() => setDeleting(true)}>Excluir</button>}
           {can('clients.manage') && <button className="btn" onClick={() => setPortalOpen(true)}>{c.user ? 'Redefinir acesso ao portal' : 'Criar acesso ao portal'}</button>}
         </>} />
       <div className="grid cols-4">
@@ -155,7 +186,7 @@ export function ClientDetailPage() {
       <div className="grid cols-2 mt">
         <div className="card">
           <h3>Dados cadastrais</h3>
-          <KV items={[['E-mail', c.email], ['Telefone', maskPhone(c.phone)], [c.personType === 'PJ' ? 'Fundação' : 'Nascimento', dateBR(c.birthDate)], ['Endereço', [c.addressStreet, c.addressNumber, c.addressComplement, c.addressDistrict, c.addressCity && `${c.addressCity}/${c.addressState}`, c.addressZip].filter(Boolean).join(', ') || null], ['Preferências de contato', ['email', 'sms', 'portal'].filter((k) => c.contactPreferences?.[k as 'email'] !== false).map((k) => CHANNEL[k.toUpperCase()]).join(', ')], ['Observações', c.notes]]} />
+          <KV items={[['Telefone', maskPhone(c.phone)], ['E-mail', c.email], ['RG', c.rg], ['Nacionalidade', c.nationality], ['Estado civil', c.maritalStatus], ['Profissão', c.profession], [c.personType === 'PJ' ? 'Fundação' : 'Nascimento', dateBR(c.birthDate)], ['Endereço', [c.addressStreet, c.addressNumber, c.addressComplement, c.addressDistrict, c.addressCity && `${c.addressCity}/${c.addressState}`, c.addressZip].filter(Boolean).join(', ') || null], ['Preferências de contato', ['email', 'sms', 'portal'].filter((k) => c.contactPreferences?.[k as 'email'] !== false).map((k) => CHANNEL[k.toUpperCase()]).join(', ')], ['Observações', c.notes]]} />
         </div>
         <div className="card">
           <div className="card-header"><h3>Documentos</h3>{can('clients.manage') && <span className="flex"><select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>{Object.entries(DOC_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select><label className="btn sm">Anexar<input type="file" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label></span>}</div>
@@ -169,9 +200,9 @@ export function ClientDetailPage() {
         {tab === 'emprestimos' && (
           <DataTable rows={c.loans} onRowClick={(l) => nav(`/app/emprestimos/${l.id}`)} emptyTitle="Nenhum empréstimo" cardTitle={(l) => `Empréstimo nº ${l.number}`} columns={[
             { key: 'number', label: 'Nº', render: (l) => <strong>{l.number}</strong>, sortValue: (l) => l.number },
-            { key: 'status', label: 'Situação', render: (l) => <StatusBadge map={LOAN_STATUS} value={l.status} /> },
-            { key: 'principal', label: 'Principal', num: true, render: (l) => brl(l.principalAmount) },
-            { key: 'parcelas', label: 'Parcelas', render: (l) => `${l.summary.paidCount}/${l.installmentsCount} pagas · ${brl(l.installmentAmount)}` },
+            { key: 'status', label: 'Situação', render: (l) => (l.ledgerStatus ? <StatusPill status={l.ledgerStatus} /> : <StatusBadge map={LOAN_STATUS} value={l.status} />) },
+            { key: 'principal', label: 'Valor emprestado', num: true, render: (l) => brl(l.principalAmount) },
+            { key: 'parcelas', label: 'Condições', render: (l) => (l.engine === 'BALANCE' ? `${BILLING_TYPE[l.billingType ?? '']?.label ?? ''}${l.summary.nextDue ? ` · próximo ${dateBR(l.summary.nextDue.date)}` : ''}` : `${l.summary.paidInstallments ?? 0}/${l.installmentsCount} pagas · ${brl(l.installmentAmount)}`) },
             { key: 'open', label: 'Saldo devedor', num: true, render: (l) => brl(l.summary.openBalance) },
             { key: 'overdue', label: 'Em atraso', num: true, render: (l) => (Number(l.summary.overdueBalance) > 0 ? <span style={{ color: 'var(--danger)' }}>{brl(l.summary.overdueBalance)}</span> : '—') },
             { key: 'contracts', label: 'Contrato', render: (l) => (l.contracts.length ? <StatusBadge map={{ DRAFT: { label: 'Rascunho', tone: 'neutral' }, IN_REVIEW: { label: 'Em revisão', tone: 'info' }, AWAITING_SIGNATURE: { label: 'Aguardando assinatura', tone: 'warning' }, SIGNED: { label: 'Assinado', tone: 'success' }, CANCELLED: { label: 'Cancelado', tone: 'danger' } }} value={l.contracts[0].status} /> : '—') },
@@ -193,7 +224,7 @@ export function ClientDetailPage() {
         {tab === 'pagamentos' && (
           <DataTable rows={c.payments} emptyTitle="Nenhum pagamento registrado" cardTitle={(p) => `${brl(p.amount)} em ${dateBR(p.paidAt)}`} columns={[
             { key: 'paidAt', label: 'Data', render: (p) => dateBR(p.paidAt), sortValue: (p) => p.paidAt },
-            { key: 'loan', label: 'Empréstimo/Parcela', render: (p) => `${p.loan?.number} / ${p.installment?.number}` },
+            { key: 'loan', label: 'Empréstimo', render: (p) => `${p.loan?.number}${p.installment ? ` / parcela ${p.installment.number}` : ''}` },
             { key: 'amount', label: 'Valor', num: true, render: (p) => brl(p.amount) },
             { key: 'alloc', label: 'Destinação', render: (p) => <span className="small">Principal {brl(p.principalPortion)} · Juros {brl(p.interestPortion)} · Encargos {brl(p.chargesPortion)}{Number(p.discountAmount) > 0 && ` · Desconto ${brl(p.discountAmount)}`}</span> },
             { key: 'method', label: 'Forma', render: (p) => PAYMENT_METHOD[p.method] },
@@ -222,6 +253,7 @@ export function ClientDetailPage() {
         )}
       </div>
       {editing && <ClientForm initial={c} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); refresh(); }} />}
+      {deleting && <Confirm danger title="Excluir cliente" confirmLabel="Excluir" busy={remove.isPending} text={c.loans.length ? <>Este cliente tem {c.loans.length} empréstimo(s). Exclua os empréstimos antes ou marque o cliente como inativo em “Editar cadastro”.</> : <>Excluir o cadastro de <strong>{c.name}</strong> e seus documentos? Esta ação não pode ser desfeita.</>} onCancel={() => setDeleting(false)} onConfirm={() => (c.loans.length ? setDeleting(false) : remove.mutate())} />}
       {portalOpen && (
         <Modal title="Acesso ao portal do cliente" onClose={() => setPortalOpen(false)}>
           <p className="muted">O cliente entra em <span className="mono">/portal/{'{empresa}'}</span> com CPF/CNPJ ou e-mail e a senha provisória abaixo, que deverá ser trocada no primeiro acesso.</p>

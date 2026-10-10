@@ -7,11 +7,17 @@ import { dateTimeBR } from '../../lib/format';
 import { PageHeader, Loading, ErrorState, Field, useForm, useToast, errorMessage, Tabs, DataTable, Modal, Alert, Badge } from '../../components/ui';
 import { ProductsSettings } from './LoansPages';
 import { TemplatesSettings } from './ContractsSection';
+import { CreditorTab, CalcTab, BackupTab, AppearanceTab, MoreTab } from './lending/SettingsLending';
 
 export function SettingsPage() {
-  const [tab, setTab] = useState('empresa');
+  const [tab, setTab] = useState('credor');
   const { can, user } = useAuth();
   const tabs = [
+    { key: 'credor', label: 'Meus dados' },
+    { key: 'calculo', label: 'Juros e atraso' },
+    { key: 'backup', label: 'Exportar e backup' },
+    { key: 'aparencia', label: 'Aparência' },
+    { key: 'mais', label: 'Mais funções' },
     { key: 'empresa', label: 'Empresa e marca' },
     ...(can('settings.manage') ? [{ key: 'produtos', label: 'Produtos de crédito' }] : []),
     ...(can('contracts.manage') ? [{ key: 'modelos', label: 'Modelos de contrato' }] : []),
@@ -23,6 +29,11 @@ export function SettingsPage() {
     <>
       <PageHeader title="Configurações" subtitle={user?.company?.name} />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
+      {tab === 'credor' && <CreditorTab />}
+      {tab === 'calculo' && <CalcTab />}
+      {tab === 'backup' && <BackupTab />}
+      {tab === 'aparencia' && <AppearanceTab />}
+      {tab === 'mais' && <MoreTab />}
       {tab === 'empresa' && <CompanySettings />}
       {tab === 'produtos' && <ProductsSettings />}
       {tab === 'modelos' && <TemplatesSettings />}

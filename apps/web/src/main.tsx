@@ -6,6 +6,9 @@ import { AuthProvider } from './auth/AuthContext';
 import { ToastProvider } from './components/ui';
 import { AppRoutes } from './routes';
 import './styles.css';
+import { applyTheme } from './lib/theme';
+
+applyTheme();
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 10_000 } } });
 

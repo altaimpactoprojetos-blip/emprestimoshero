@@ -19,7 +19,7 @@ export function LoansPage() {
   const q = useQuery({ queryKey: ['loans', status], queryFn: () => api<Loan[]>(`loans?status=${status}`) });
   return (
     <>
-      <PageHeader title="Empréstimos" subtitle="Propostas, contratos em andamento e quitados." actions={can('loans.create') && <button className="btn primary" onClick={() => nav('/app/emprestimos/novo')}>Simular empréstimo</button>} />
+      <PageHeader title="Empréstimos" subtitle="Propostas, contratos em andamento e quitados." actions={can('loans.create') && <button className="btn primary" onClick={() => nav('/app/emprestimos/parcelados/novo')}>Simular empréstimo</button>} />
       <div className="card">
         {q.isLoading ? <Loading /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : (
           <DataTable rows={q.data!} searchKeys={(l) => `${l.number} ${l.client?.name} ${l.client?.document}`} onRowClick={(l) => nav(`/app/emprestimos/${l.id}`)} cardTitle={(l) => `Nº ${l.number} · ${l.client?.name}`}

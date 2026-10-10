@@ -64,3 +64,17 @@ export const PERIODICITY: Record<string, string> = { MONTHLY: 'Mensal', BIWEEKLY
 export const CALC_METHOD: Record<string, string> = { PRICE: 'Tabela Price (parcelas fixas)', SAC: 'SAC (amortização constante)', SIMPLE: 'Juros simples' };
 export const ROLE: Record<string, string> = { PLATFORM_OWNER: 'Proprietário da plataforma', COMPANY_ADMIN: 'Administrador', FINANCE: 'Financeiro', COLLECTION: 'Atendimento/Cobrança', CLIENT: 'Cliente' };
 export const CHANNEL: Record<string, string> = { EMAIL: 'E-mail', SMS: 'SMS', PORTAL: 'Portal' };
+
+/** Situação dos empréstimos sobre saldo: verde em dia, amarelo vence hoje/semana, vermelho atrasado, cinza quitado. */
+export const LOAN_DISPLAY: Record<string, string> = { ON_TIME: 'Em dia', DUE_TODAY: 'Vence hoje', DUE_THIS_WEEK: 'Vence esta semana', OVERDUE: 'Atrasado', PAID: 'Quitado' };
+export const BILLING_TYPE: Record<string, { label: string; hint: string }> = {
+  INTEREST_ONLY: { label: 'Só juros', hint: 'Juros a cada período e o valor emprestado no final' },
+  FIXED_INSTALLMENTS: { label: 'Parcelas fixas', hint: 'Parcelas iguais com juros e amortização' },
+  SINGLE_PAYMENT: { label: 'Pagamento único', hint: 'Tudo (valor + juros) no vencimento' },
+};
+export const RATE_PERIOD: Record<string, string> = { MONTHLY: 'ao mês', WEEKLY: 'por semana', BIWEEKLY: 'por quinzena', DAILY: 'ao dia' };
+export const RATE_PERIOD_NAME: Record<string, string> = { MONTHLY: 'Mensal', WEEKLY: 'Semanal', BIWEEKLY: 'Quinzenal', DAILY: 'Diária' };
+export const PERIOD_STATUS: Record<string, { label: string; st: string }> = {
+  PAID: { label: 'Pago', st: 'PAID' }, OVERDUE: { label: 'Atrasado', st: 'OVERDUE' }, DUE_TODAY: { label: 'Vence hoje', st: 'DUE_TODAY' },
+  UPCOMING: { label: 'A vencer', st: 'ON_TIME' }, PROJECTED: { label: 'Previsto', st: 'ON_TIME' }, ACCRUING: { label: 'Juros do período', st: 'ON_TIME' },
+};

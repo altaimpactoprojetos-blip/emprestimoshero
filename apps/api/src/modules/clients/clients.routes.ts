@@ -12,6 +12,8 @@ import { computeBalance } from '../../domain/installment.js';
 import { todayIn } from '../../lib/dates.js';
 import { D, sum, type Dec } from '../../lib/money.js';
 import { dateOnly } from '../../lib/dates.js';
+import { ledgerOf } from '../lending/lending.service.js';
+import { serializeLedger } from '../../domain/balance.js';
 
 export const clientsRouter = Router();
 clientsRouter.use(authenticate, requireCompany);
@@ -80,6 +82,15 @@ clientsRouter.get('/', requirePermission('clients.view'), async (req, res, next)
       if (b.daysLate > 0) { cur.overdue = cur.overdue.plus(b.totalDue); cur.maxDaysLate = Math.max(cur.maxDaysLate, b.daysLate); }
       byClient.set(i.loan.clientId, cur);
     }
+    // empréstimos sobre saldo devedor
+    const balanceLoans = await prisma.loan.findMany({ where: { companyId, engine: 'BALANCE', status: 'ACTIVE', clientId: { in: clients.map((c) => c.id) } }, include: { payments: { where: { status: 'CONFIRMED' }, select: { id: true, paidAt: true, amount: true }, orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }] } } });
+    for (const l of balanceLoans) {
+      const r = ledgerOf(l, l.payments, today);
+      const cur = byClient.get(l.clientId) ?? { open: D(0), overdue: D(0), maxDaysLate: 0 };
+      cur.open = cur.open.plus(r.balance);
+      if (r.overdueAmount.gt(0)) { cur.overdue = cur.overdue.plus(r.overdueAmount).plus(r.chargesPending); cur.maxDaysLate = Math.max(cur.maxDaysLate, r.daysLate); }
+      byClient.set(l.clientId, cur);
+    }
     res.json(clients.map((c) => ({ ...c, summary: { openBalance: (byClient.get(c.id)?.open ?? D(0)).toFixed(2), overdueBalance: (byClient.get(c.id)?.overdue ?? D(0)).toFixed(2), maxDaysLate: byClient.get(c.id)?.maxDaysLate ?? 0, loans: c._count.loans } })));
   } catch (e) { next(e); }
 });
@@ -113,7 +124,7 @@ clientsRouter.get('/:id', requirePermission('clients.view'), async (req, res, ne
       include: {
         documents: { include: { file: true }, orderBy: { createdAt: 'desc' } },
         user: { select: { id: true, email: true, active: true, lastLoginAt: true } },
-        loans: { orderBy: { createdAt: 'desc' }, include: { installments: { orderBy: { number: 'asc' } }, contracts: { select: { id: true, status: true, version: true, kind: true, signedAt: true }, orderBy: { createdAt: 'desc' } } } },
+        loans: { orderBy: { createdAt: 'desc' }, include: { payments: { where: { status: 'CONFIRMED' }, select: { id: true, paidAt: true, amount: true }, orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }] }, installments: { orderBy: { number: 'asc' } }, contracts: { select: { id: true, status: true, version: true, kind: true, signedAt: true }, orderBy: { createdAt: 'desc' } } } },
         serviceRequests: { orderBy: { createdAt: 'desc' } },
         reminders: { orderBy: { createdAt: 'desc' }, take: 100, include: { installment: { select: { number: true, dueDate: true, loanId: true } } } },
         notifications: { orderBy: { createdAt: 'desc' }, take: 50 },
@@ -124,11 +135,16 @@ clientsRouter.get('/:id', requirePermission('clients.view'), async (req, res, ne
     const today = todayIn(company.timezone);
     const payments = await prisma.payment.findMany({ where: { clientId: client.id, companyId }, orderBy: { paidAt: 'desc' }, include: { installment: { select: { number: true } }, loan: { select: { number: true } } } });
     const loans = client.loans.map((l) => {
+      if (l.engine === 'BALANCE') {
+        const r = ['ACTIVE', 'PAID'].includes(l.status) ? ledgerOf(l, l.payments, today) : null;
+        const active = l.status === 'ACTIVE' && r;
+        return { ...l, payments: undefined, installments: [], ledgerStatus: r?.status ?? null, summary: { openBalance: active ? r.balance.toFixed(2) : '0.00', overdueBalance: active && r.overdueAmount.gt(0) ? r.overdueAmount.plus(r.chargesPending).toFixed(2) : '0.00', maxDaysLate: active ? r.daysLate : 0, paidInstallments: 0, progress: r ? serializeLedger(r).progress : 0, nextDue: r?.nextDue ? { date: r.nextDue.date.toISOString().slice(0, 10), amount: r.nextDue.amount.toFixed(2) } : null } };
+      }
       const balances = l.installments.map((i) => ({ ...i, balance: computeBalance(i, l, today) }));
       const open = l.status === 'ACTIVE' ? sum(balances.map((b) => b.balance.totalDue)) : D(0);
       const overdue = l.status === 'ACTIVE' ? sum(balances.filter((b) => b.balance.daysLate > 0).map((b) => b.balance.totalDue)) : D(0);
       const maxDaysLate = Math.max(0, ...balances.map((b) => b.balance.daysLate));
-      return { ...l, installments: balances.map((b) => ({ ...b, balance: serializeBalance(b.balance) })), summary: { openBalance: open.toFixed(2), overdueBalance: overdue.toFixed(2), maxDaysLate, paidInstallments: l.installments.filter((i) => i.status === 'PAID').length } };
+      return { ...l, payments: undefined, ledgerStatus: null, installments: balances.map((b) => ({ ...b, balance: serializeBalance(b.balance) })), summary: { openBalance: open.toFixed(2), overdueBalance: overdue.toFixed(2), maxDaysLate, paidInstallments: l.installments.filter((i) => i.status === 'PAID').length } };
     });
     const totals = {
       openBalance: sum(loans.map((l) => l.summary.openBalance)).toFixed(2),

@@ -7,7 +7,8 @@ import { LoginPage, ForgotPasswordPage, ResetPasswordPage } from './pages/auth/L
 import { PlatformOverview, PlatformCompanies, PlatformCompanyDetail, PlatformPlans, PlatformInvoices } from './pages/platform/PlatformPages';
 import { SettingsPage } from './pages/app/SettingsPages';
 import { AuditPage } from './pages/app/AuditPage';
-import { appRoutes, appNav } from './pages/app/index';
+import { appRoutes } from './pages/app/index';
+import { MobileShell } from './components/MobileShell';
 import { portalRoutes, PortalShell, PortalLoginPage, PortalAccessPage } from './pages/portal/index';
 
 function Home() {
@@ -47,7 +48,7 @@ export function AppRoutes() {
         <Route path="faturas" element={<PlatformInvoices />} />
       </Route>
 
-      <Route path="/app" element={<RequireRole roles={['COMPANY_ADMIN', 'FINANCE', 'COLLECTION']}><AppShell brandTitle={user?.company?.name ?? 'Empresa'} brandSub="Gestão de empréstimos" logoUrl={user?.company?.logoFileId ? `/api/company/public/${user.company.slug}/logo` : null} groups={appNav} /></RequireRole>}>
+      <Route path="/app" element={<RequireRole roles={['COMPANY_ADMIN', 'FINANCE', 'COLLECTION']}><MobileShell title={user?.company?.name ?? 'Empréstimos'} logoUrl={user?.company?.logoFileId ? `/api/company/public/${user.company.slug}/logo` : null} /></RequireRole>}>
         {appRoutes}
         <Route path="configuracoes" element={<SettingsPage />} />
         <Route path="auditoria" element={<AuditPage />} />
