@@ -31,6 +31,10 @@ const clientSchema = z.object({
   addressCity: z.string().optional().nullable(),
   addressState: z.string().max(2).optional().nullable(),
   addressZip: z.string().optional().nullable(),
+  rg: z.string().max(30).optional().nullable(),
+  nationality: z.string().max(60).optional().nullable(),
+  maritalStatus: z.string().max(40).optional().nullable(),
+  profession: z.string().max(80).optional().nullable(),
   notes: z.string().optional().nullable(),
   status: z.enum(['ACTIVE', 'BLOCKED', 'INACTIVE']).optional(),
   contactPreferences: z.object({ email: z.boolean(), sms: z.boolean(), portal: z.boolean() }).partial().optional(),
@@ -154,6 +158,30 @@ clientsRouter.put('/:id', requirePermission('clients.manage'), async (req, res, 
     const client = await prisma.client.update({ where: { id: before.id }, data });
     await audit(req.auth!, { action: 'CLIENT_UPDATE', entity: 'Client', entityId: client.id, before, after: client });
     res.json(client);
+  } catch (e) { next(e); }
+});
+
+/** Exclui um cliente sem empréstimos (a interface pede confirmação antes). */
+clientsRouter.delete('/:id', requirePermission('clients.manage'), async (req, res, next) => {
+  try {
+    const companyId = companyOf(req);
+    const client = await prisma.client.findFirst({ where: { id: String(req.params.id), companyId }, include: { _count: { select: { loans: true, payments: true } }, user: { select: { id: true } } } });
+    if (!client) throw notFound('Cliente não encontrado');
+    if (client._count.loans > 0 || client._count.payments > 0) throw badRequest('Este cliente tem empréstimos cadastrados. Exclua os empréstimos antes ou marque o cliente como inativo.');
+    await prisma.$transaction(async (tx) => {
+      await tx.clientDocument.deleteMany({ where: { clientId: client.id } });
+      await tx.notification.deleteMany({ where: { clientId: client.id } });
+      await tx.serviceRequest.deleteMany({ where: { clientId: client.id } });
+      await tx.clientAccessToken.deleteMany({ where: { clientId: client.id } });
+      // o acesso ao portal é desativado e desvinculado (o usuário fica no registro de ações)
+      if (client.user) {
+        await tx.refreshToken.deleteMany({ where: { userId: client.user.id } });
+        await tx.user.update({ where: { id: client.user.id }, data: { clientId: null, active: false } });
+      }
+      await tx.client.delete({ where: { id: client.id } });
+      await audit(req.auth!, { action: 'CLIENT_DELETE', entity: 'Client', entityId: client.id, before: client }, tx);
+    });
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 

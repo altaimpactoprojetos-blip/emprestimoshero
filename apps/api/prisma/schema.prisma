@@ -289,6 +289,10 @@ model Client {
   addressCity  String?
   addressState String?
   addressZip   String?
+  rg           String?
+  nationality  String?
+  maritalStatus String?
+  profession   String?
   notes        String?
   status       ClientStatus @default(ACTIVE)
   contactPreferences Json   @default("{\"email\":true,\"sms\":true,\"portal\":true}")
@@ -378,6 +382,26 @@ enum LoanStatus {
   CANCELLED
 }
 
+/// Motor de cálculo do empréstimo: SCHEDULE = parcelas pré-calculadas (Price/SAC/simples);
+/// BALANCE = juros de cada período sobre o saldo devedor atual (pagamentos parciais recalculam tudo).
+enum LoanEngine {
+  SCHEDULE
+  BALANCE
+}
+
+/// Tipo de cobrança dos empréstimos sobre saldo devedor.
+enum BillingType {
+  INTEREST_ONLY      // só juros a cada período e principal no final
+  FIXED_INSTALLMENTS // parcelas fixas (juros sobre o saldo + amortização)
+  SINGLE_PAYMENT     // pagamento único com juros no final
+}
+
+/// Juros não pagos no período: ficam separados ou são somados ao principal.
+enum PendingInterestMode {
+  SEPARATE
+  CAPITALIZE
+}
+
 enum CollectionState {
   ACTIVE
   PAUSED
@@ -411,6 +435,14 @@ model Loan {
   iofDailyRate        Decimal         @default(0) @db.Decimal(10, 6)
   lateFineRate        Decimal         @default(2) @db.Decimal(10, 6)
   lateInterestMonthly Decimal         @default(1) @db.Decimal(10, 6)
+
+  // empréstimos sobre saldo devedor (engine = BALANCE)
+  engine              LoanEngine      @default(SCHEDULE)
+  billingType         BillingType?
+  periodRate          Decimal?        @db.Decimal(10, 6) // % por período (diário, semanal, quinzenal ou mensal)
+  maturityDate        DateTime?       @db.Date
+  pendingInterestMode PendingInterestMode @default(SEPARATE)
+  disbursementMethod  String?         // PIX, transferência, dinheiro...
 
   // resultados do cálculo (congelados na confirmação)
   installmentAmount   Decimal         @db.Decimal(14, 2) // primeira parcela (SAC varia)
@@ -548,8 +580,8 @@ model Payment {
   company          Company       @relation(fields: [companyId], references: [id])
   loanId           String
   loan             Loan          @relation(fields: [loanId], references: [id])
-  installmentId    String
-  installment      Installment   @relation(fields: [installmentId], references: [id])
+  installmentId    String?
+  installment      Installment?  @relation(fields: [installmentId], references: [id], onDelete: Restrict)
   clientId         String
   client           Client        @relation(fields: [clientId], references: [id])
   receiptNumber    Int?
@@ -558,6 +590,7 @@ model Payment {
   interestPortion  Decimal       @default(0) @db.Decimal(14, 2)
   chargesPortion   Decimal       @default(0) @db.Decimal(14, 2)
   discountAmount   Decimal       @default(0) @db.Decimal(14, 2)
+  balanceAfter     Decimal?      @db.Decimal(14, 2) // principal em aberto após o pagamento (engine BALANCE)
   method           PaymentMethod @default(OTHER)
   status           PaymentStatus @default(CONFIRMED)
   source           PaymentSource @default(MANUAL)

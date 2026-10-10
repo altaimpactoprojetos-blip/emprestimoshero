@@ -12,6 +12,7 @@ import { audit } from '../../lib/audit.js';
 import { addEvent, companyTimezone, createLoan, loanInputSchema } from '../loans/loans.service.js';
 import { renderPdf } from '../../services/pdf.js';
 import { maskDoc } from '../../lib/text.js';
+import { valorPorExtenso } from '../../lib/extenso.js';
 
 export const paymentSchema = z.object({
   installmentId: zId,
@@ -111,6 +112,7 @@ export async function reversePayment(ctx: AuthContext, paymentId: string, reason
     if (p.status !== 'CONFIRMED') throw badRequest('Somente pagamentos confirmados podem ser estornados');
     if (p.source === 'PAYOFF' || p.source === 'RENEGOTIATION') throw badRequest('Lançamentos de quitação/renegociação não são estornáveis individualmente');
     const inst = p.installment;
+    if (!inst) throw badRequest('Pagamento de empréstimo sobre saldo devedor: use editar ou excluir na tela do empréstimo');
     if (inst.status === 'RENEGOTIATED') throw badRequest('Parcela renegociada; estorne pela renegociação');
     // O pagamento original é preservado (status REVERSED); a parcela volta a refletir o saldo anterior.
     const otherPayments = await tx.payment.findMany({ where: { installmentId: inst.id, status: 'CONFIRMED', id: { not: p.id } }, orderBy: { paidAt: 'desc' } });
@@ -154,6 +156,7 @@ export async function reviewProof(ctx: AuthContext, paymentId: string, decision:
       return r;
     }
     const inst = p.installment;
+    if (!inst) throw badRequest('Comprovante sem parcela vinculada');
     if (!['PENDING', 'PARTIAL'].includes(inst.status)) throw badRequest('Parcela não está mais em aberto');
     const balance = computeBalance(inst, inst.loan, p.paidAt);
     let alloc;
@@ -283,15 +286,28 @@ export async function receiptPdf(companyId: string, paymentId: string) {
   const p = await prisma.payment.findFirst({ where: { id: paymentId, companyId }, include: { installment: true, loan: true, client: true, company: true } });
   if (!p) throw notFound('Pagamento não encontrado');
   if (p.status !== 'CONFIRMED') throw badRequest('Recibo disponível apenas para pagamentos confirmados');
-  const settings = (p.company.settings ?? {}) as { receiptFooter?: string };
+  const settings = (p.company.settings ?? {}) as { receiptFooter?: string; creditor?: { name?: string; cpf?: string } };
   const METHOD: Record<string, string> = { PIX: 'Pix', BOLETO: 'Boleto', CASH: 'Dinheiro', TRANSFER: 'Transferência', CARD: 'Cartão', OTHER: 'Outro' };
+  const balanceLoan = !p.installment;
+  // empréstimos sobre saldo devedor: o recibo sai em nome do credor cadastrado em Configurações (se houver)
+  const issuer = balanceLoan && settings.creditor?.name
+    ? `${settings.creditor.name}${settings.creditor.cpf ? `, CPF ${maskDoc(settings.creditor.cpf)}` : ''}`
+    : `${p.company.legalName ?? p.company.name}${p.company.cnpj ? `, CNPJ ${maskDoc(p.company.cnpj)}` : ''}`;
+  const reference = p.installment
+    ? `referente à parcela ${p.installment.number} de ${p.loan.installmentsCount} do empréstimo nº ${p.loan.number}, com vencimento em ${formatBRDate(p.installment.dueDate)}`
+    : `referente a pagamento do empréstimo nº ${p.loan.number}`;
   return renderPdf([
     { type: 'title', text: `RECIBO Nº ${p.receiptNumber}` },
-    { type: 'paragraph', text: `${p.company.legalName ?? p.company.name}${p.company.cnpj ? `, CNPJ ${maskDoc(p.company.cnpj)}` : ''}, declara ter recebido de ${p.client.name}, ${p.client.personType === 'PJ' ? 'CNPJ' : 'CPF'} ${maskDoc(p.client.document)}, a importância de ${formatBRL(p.amount)} referente à parcela ${p.installment.number} de ${p.loan.installmentsCount} do empréstimo nº ${p.loan.number}, com vencimento em ${formatBRDate(p.installment.dueDate)}.` },
-    { type: 'kv', rows: [['Data do pagamento', formatBRDate(p.paidAt)], ['Forma de pagamento', METHOD[p.method]], ['Valor recebido', formatBRL(p.amount)], ['Destinação — principal', formatBRL(p.principalPortion)], ['Destinação — juros', formatBRL(p.interestPortion)], ['Destinação — encargos de atraso', formatBRL(p.chargesPortion)], ['Desconto concedido', formatBRL(p.discountAmount)], ['Recebido por', p.receivedByName ?? '—'], ['Emitido em', formatBRDate(new Date())]] },
+    { type: 'paragraph', text: `${issuer}, declara ter recebido de ${p.client.name}, ${p.client.personType === 'PJ' ? 'CNPJ' : 'CPF'} ${maskDoc(p.client.document)}, a importância de ${formatBRL(p.amount)} (${valorPorExtenso(p.amount)}) ${reference}.` },
+    { type: 'kv', rows: [
+      ['Data do pagamento', formatBRDate(p.paidAt)], ['Forma de pagamento', METHOD[p.method]], ['Valor recebido', formatBRL(p.amount)],
+      ['Destinação — juros', formatBRL(p.interestPortion)], ['Destinação — principal', formatBRL(p.principalPortion)], ['Destinação — encargos de atraso', formatBRL(p.chargesPortion)],
+      ...(balanceLoan ? [['Saldo devedor (principal) após o pagamento', formatBRL(p.balanceAfter ?? 0)] as [string, string]] : [['Desconto concedido', formatBRL(p.discountAmount)] as [string, string]]),
+      ['Recebido por', p.receivedByName ?? '—'], ['Emitido em', formatBRDate(new Date())],
+    ] },
     ...(p.notes ? [{ type: 'small' as const, text: `Observações: ${p.notes}` }] : []),
     { type: 'small', text: `Identificador: ${p.id}` },
-  ], { title: `Recibo ${p.receiptNumber}`, header: p.company.name, footer: settings.receiptFooter ?? 'Documento emitido eletronicamente.' });
+  ], { title: `Recibo ${p.receiptNumber}`, header: balanceLoan && settings.creditor?.name ? settings.creditor.name : p.company.name, footer: settings.receiptFooter ?? 'Documento emitido eletronicamente.' });
 }
 
 export type { Prisma };

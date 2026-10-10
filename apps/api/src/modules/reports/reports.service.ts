@@ -86,7 +86,7 @@ export async function buildMonthlyReport(companyId: string, month: string, refer
   const overdue = openAtRef.map((i) => ({ i, b: computeBalance(i, i.loan, asOf) })).filter((x) => x.b.daysLate > 0);
   const nextRange = monthRange(monthKey(end));
   const projection = installmentsAll.filter((i) => ['PENDING', 'PARTIAL'].includes(i.status) && i.loan.status === 'ACTIVE' && i.dueDate >= nextRange.start && i.dueDate < nextRange.end);
-  const pmtRow = (p: (typeof payments)[number]) => ({ id: p.id, paidAt: p.paidAt.toISOString().slice(0, 10), client: p.client.name, loan: p.loan.number, installment: p.installment.number, amount: f2(p.amount), principal: f2(p.principalPortion), interest: f2(p.interestPortion), charges: f2(p.chargesPortion), discount: f2(p.discountAmount), method: p.method, source: p.source, receivedBy: p.receivedByName, receiptNumber: p.receiptNumber, reason: p.reversalReason });
+  const pmtRow = (p: (typeof payments)[number]) => ({ id: p.id, paidAt: p.paidAt.toISOString().slice(0, 10), client: p.client.name, loan: p.loan.number, installment: p.installment?.number ?? '—', amount: f2(p.amount), principal: f2(p.principalPortion), interest: f2(p.interestPortion), charges: f2(p.chargesPortion), discount: f2(p.discountAmount), method: p.method, source: p.source, receivedBy: p.receivedByName, receiptNumber: p.receiptNumber, reason: p.reversalReason });
   const data = {
     month,
     referenceDate: referenceDate.toISOString(),
@@ -234,7 +234,7 @@ export async function monthlyXlsx(data: MonthlyData & { previous?: MonthlyData['
 
 export async function receiptsExtract(companyId: string, p: PeriodFilter) {
   const rows = await paymentsIn(companyId, p);
-  return rows.map((r) => ({ id: r.id, paidAt: r.paidAt.toISOString().slice(0, 10), client: r.client.name, clientId: r.clientId, loan: r.loan.number, loanId: r.loanId, installment: r.installment.number, amount: f2(r.amount), principal: f2(r.principalPortion), interest: f2(r.interestPortion), charges: f2(r.chargesPortion), discount: f2(r.discountAmount), method: r.method, source: r.source, status: r.status, receivedBy: r.receivedByName, receiptNumber: r.receiptNumber }));
+  return rows.map((r) => ({ id: r.id, paidAt: r.paidAt.toISOString().slice(0, 10), client: r.client.name, clientId: r.clientId, loan: r.loan.number, loanId: r.loanId, installment: r.installment?.number ?? '—', amount: f2(r.amount), principal: f2(r.principalPortion), interest: f2(r.interestPortion), charges: f2(r.chargesPortion), discount: f2(r.discountAmount), method: r.method, source: r.source, status: r.status, receivedBy: r.receivedByName, receiptNumber: r.receiptNumber }));
 }
 
 export async function receiptsXlsx(rows: Awaited<ReturnType<typeof receiptsExtract>>) {

@@ -9,6 +9,7 @@ import { chargesRouter } from './payments/charges.routes.js';
 import { webhooksRouter } from './webhooks/webhooks.routes.js';
 import { reportsRouter } from './reports/reports.routes.js';
 import { portalRouter } from './portal/portal.routes.js';
+import { lendingRouter } from './lending/lending.routes.js';
 
 /** Módulos de negócio (clientes, empréstimos, contratos, parcelas, cobranças, relatórios, portal). */
 export function registerModules(app: Express) {
@@ -22,4 +23,5 @@ export function registerModules(app: Express) {
   app.use('/api/webhooks', webhooksRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/portal', portalRouter);
+  app.use('/api/lending', lendingRouter);
 }

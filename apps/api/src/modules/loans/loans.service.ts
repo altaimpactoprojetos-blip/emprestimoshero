@@ -132,6 +132,7 @@ export async function createLoan(ctx: AuthContext, input: LoanInput, opts: { par
 
 export async function updateLoan(ctx: AuthContext, id: string, input: LoanInput) {
   const before = await loadLoan(ctx.companyId!, id);
+  if (before.engine === 'BALANCE') throw badRequest('Empréstimo sobre saldo devedor: altere pela tela do empréstimo');
   if (!EDITABLE.includes(before.status)) throw badRequest('Empréstimo não pode mais ser editado neste estado');
   const signed = await prisma.contract.count({ where: { loanId: id, status: { in: ['SIGNED', 'AWAITING_SIGNATURE'] } } });
   if (signed) throw badRequest('Existe contrato assinado ou em assinatura; gere um aditivo em vez de alterar as condições');
@@ -148,6 +149,7 @@ export async function updateLoan(ctx: AuthContext, id: string, input: LoanInput)
 
 export async function transition(ctx: AuthContext, id: string, action: 'submit' | 'assess' | 'approve' | 'reject' | 'disburse' | 'cancel', body: { notes?: string; score?: number; reason?: string; date?: string; disbursedAmount?: string }) {
   const loan = await loadLoan(ctx.companyId!, id);
+  if (loan.engine === 'BALANCE') throw badRequest('Empréstimo sobre saldo devedor não passa por aprovação/liberação');
   const now = new Date();
   return prisma.$transaction(async (tx) => {
     let data: Prisma.LoanUpdateInput = {};

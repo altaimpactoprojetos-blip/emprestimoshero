@@ -1,3 +1,4 @@
+import { valorPorExtenso } from '../lib/extenso.js';
 /**
  * Modelos de contrato: texto simples com marcadores {{campo}}.
  *  - Linhas iniciadas por "# " viram título; "## " viram subtítulo.
@@ -134,30 +135,5 @@ export function blocksToHtml(blocks: Block[]): string {
 
 /** Valor por extenso em reais (até bilhões). */
 export function numberToWordsBRL(value: number): string {
-  const units = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
-  const tens = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
-  const hundreds = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
-  const below1000 = (n: number): string => {
-    if (n === 0) return '';
-    if (n === 100) return 'cem';
-    const h = Math.floor(n / 100), r = n % 100;
-    const parts: string[] = [];
-    if (h) parts.push(hundreds[h]);
-    if (r < 20) { if (r) parts.push(units[r]); }
-    else { parts.push(tens[Math.floor(r / 10)]); if (r % 10) parts.push(units[r % 10]); }
-    return parts.join(' e ');
-  };
-  const scales: Array<[number, string, string]> = [[1e9, 'bilhão', 'bilhões'], [1e6, 'milhão', 'milhões'], [1e3, 'mil', 'mil']];
-  let int = Math.floor(Math.abs(value));
-  const cents = Math.round((Math.abs(value) - int) * 100);
-  const parts: string[] = [];
-  for (const [div, sing, plur] of scales) {
-    const q = Math.floor(int / div);
-    if (q) { parts.push(div === 1e3 ? (q === 1 ? 'mil' : `${below1000(q)} mil`) : `${below1000(q)} ${q === 1 ? sing : plur}`); int %= div; }
-  }
-  if (int) parts.push(below1000(int));
-  let text = parts.join(' e ') || 'zero';
-  text += Math.floor(Math.abs(value)) === 1 ? ' real' : ' reais';
-  if (cents) text += ` e ${below1000(cents)} centavo${cents > 1 ? 's' : ''}`;
-  return text;
+  return valorPorExtenso(value);
 }
